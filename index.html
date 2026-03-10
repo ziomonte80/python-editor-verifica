@@ -27,7 +27,7 @@
     .out-info{color:#58a6ff;font-style:italic}
     .input-row{display:flex;background:#161b22;border-top:1px solid #0f3460;padding:6px 10px;gap:8px;align-items:center;flex-shrink:0}
     .input-row.hidden{display:none}
-    #input-prompt{color:#58a6ff;font-family:monospace;font-size:0.9rem;min-width:fit-content}
+    #input-prompt{color:#58a6ff;font-family:monospace;font-size:0.9rem;white-space:pre}
     #user-input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-family:monospace;font-size:0.9rem;padding:4px 8px;outline:none}
     #user-input:focus{border-color:#58a6ff}
     #btn-send{background:#238636;color:white;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:0.85rem}
@@ -75,18 +75,15 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
   </div>
   <script>
     const editor = CodeMirror.fromTextArea(document.getElementById('code'), {
-      mode: 'python',
-      theme: 'dracula',
-      lineNumbers: true,
-      indentUnit: 4,
-      tabSize: 4,
-      indentWithTabs: false,
+      mode: 'python', theme: 'dracula', lineNumbers: true,
+      indentUnit: 4, tabSize: 4, indentWithTabs: false,
       extraKeys: { Tab: cm => cm.execCommand('insertSoftTab') }
     });
     editor.setSize('100%', '100%');
 
     let pyodide = null;
-    let inputResolve = null;
+    // Coda messaggi per input: ogni elemento e' una Promise {resolve}
+    let inputQueue = [];
 
     const outputEl = document.getElementById('output');
     const btnRun = document.getElementById('btn-run');
@@ -95,7 +92,7 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
     const inputRow = document.getElementById('input-row');
     const userInputEl = document.getElementById('user-input');
     const btnSend = document.getElementById('btn-send');
-    const inputPrompt = document.getElementById('input-prompt');
+    const inputPromptEl = document.getElementById('input-prompt');
 
     function appendOutput(text, cls) {
       const s = document.createElement('span');
@@ -105,13 +102,42 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
       outputEl.scrollTop = outputEl.scrollHeight;
     }
 
+    // Restituisce una Promise che si risolve quando l'utente invia l'input
+    function askUser(promptText) {
+      return new Promise((resolve) => {
+        inputPromptEl.textContent = promptText || '';
+        inputRow.classList.remove('hidden');
+        userInputEl.value = '';
+        userInputEl.focus();
+        inputQueue.push(resolve);
+      });
+    }
+
+    function sendInput() {
+      if (inputQueue.length === 0) return;
+      const val = userInputEl.value;
+      appendOutput((inputPromptEl.textContent || '') + val + '\n', 'out-text');
+      inputRow.classList.add('hidden');
+      const resolve = inputQueue.shift();
+      resolve(val);
+    }
+
+    btnSend.addEventListener('click', sendInput);
+    userInputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); sendInput(); }
+    });
+
     async function loadPy() {
       statusEl.textContent = 'Caricamento Python...';
       pyodide = await loadPyodide();
-      pyodide.globals.set('_js_print', (t) => { appendOutput(t, 'out-text'); });
-      pyodide.globals.set('_js_input', (p) => getInputFromUser(p));
+
+      // Registra le funzioni JS in globals Python
+      pyodide.globals.set('_js_print', (t) => appendOutput(t, 'out-text'));
+      pyodide.globals.set('_js_input', (p) => askUser(p));
+
       await pyodide.runPythonAsync(`
 import sys, builtins
+from pyodide.ffi import run_sync
 
 class _Writer:
     def write(self, t):
@@ -122,47 +148,23 @@ sys.stdout = _Writer()
 sys.stderr = _Writer()
 
 def input(prompt=''):
-    import pyodide.ffi
-    result = _js_input(prompt)
-    if hasattr(result, 'to_py'):
-        return result.to_py()
-    return str(result)
+    if prompt:
+        _js_print(str(prompt))
+    return run_sync(_js_input(''))
 
 builtins.input = input
       `);
+
       statusEl.textContent = 'Python pronto ✓';
       btnRun.disabled = false;
     }
-
-    function getInputFromUser(promptText) {
-      return new Promise((resolve) => {
-        inputPrompt.textContent = promptText || '>>> ';
-        inputRow.classList.remove('hidden');
-        userInputEl.value = '';
-        userInputEl.focus();
-        inputResolve = resolve;
-      });
-    }
-
-    function sendInput() {
-      if (!inputResolve) return;
-      const val = userInputEl.value;
-      appendOutput(inputPrompt.textContent + val + '\n', 'out-text');
-      inputRow.classList.add('hidden');
-      const r = inputResolve;
-      inputResolve = null;
-      r(val);
-    }
-
-    btnSend.addEventListener('click', sendInput);
-    userInputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); sendInput(); }
-    });
 
     btnRun.addEventListener('click', async () => {
       const code = editor.getValue();
       if (!code.trim()) return;
       btnRun.disabled = true;
+      inputQueue = [];
+      inputRow.classList.add('hidden');
       statusEl.textContent = 'In esecuzione...';
       outputEl.innerHTML = '';
       try {
