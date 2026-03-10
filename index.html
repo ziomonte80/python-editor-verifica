@@ -4,136 +4,39 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Editor Python</title>
-
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/dracula.min.css"/>
-
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
   <script src="https://cdn.jsdelivr.net/pyodide/v0.25.1/full/pyodide.js"></script>
-
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{
-      font-family:'Segoe UI',sans-serif;
-      background:#1a1a2e;
-      color:#e0e0e0;
-      height:100vh;
-      display:flex;
-      flex-direction:column;
-      overflow:hidden
-    }
-    header{
-      background:linear-gradient(90deg,#16213e,#0f3460);
-      padding:10px 20px;
-      display:flex;
-      align-items:center;
-      gap:14px;
-      border-bottom:3px solid #e94560;
-      flex-shrink:0
-    }
+    body{font-family:'Segoe UI',sans-serif;background:#1a1a2e;color:#e0e0e0;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+    header{background:linear-gradient(90deg,#16213e,#0f3460);padding:10px 20px;display:flex;align-items:center;gap:14px;border-bottom:3px solid #e94560;flex-shrink:0}
     .logo{font-size:1.2rem;font-weight:700;color:#e94560;letter-spacing:1px}
     .subtitle{font-size:0.8rem;color:#a0aec0}
     .main{display:flex;flex:1;overflow:hidden}
     .editor-panel{flex:1;display:flex;flex-direction:column;border-right:2px solid #0f3460;overflow:hidden}
     .output-panel{width:42%;display:flex;flex-direction:column;overflow:hidden}
-    .panel-label{
-      background:#16213e;
-      padding:6px 14px;
-      font-size:0.75rem;
-      color:#a0aec0;
-      text-transform:uppercase;
-      letter-spacing:1px;
-      border-bottom:1px solid #0f3460;
-      flex-shrink:0
-    }
+    .panel-label{background:#16213e;padding:6px 14px;font-size:0.75rem;color:#a0aec0;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid #0f3460;flex-shrink:0}
     .editor-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column}
-    .CodeMirror{
-      height:100%!important;
-      font-size:0.92rem;
-      font-family:'Fira Mono','Consolas',monospace
-    }
-    #output{
-      flex:1;
-      background:#0d1117;
-      padding:14px;
-      font-family:'Fira Mono','Consolas',monospace;
-      font-size:0.88rem;
-      overflow-y:auto;
-      white-space:pre-wrap;
-      color:#c9d1d9
-    }
+    .CodeMirror{height:100%!important;font-size:0.92rem;font-family:'Fira Mono','Consolas',monospace}
+    #output{flex:1;background:#0d1117;padding:14px;font-family:'Fira Mono','Consolas',monospace;font-size:0.88rem;overflow-y:auto;white-space:pre-wrap;color:#c9d1d9}
     .out-text{color:#c9d1d9}
     .out-error{color:#ff7b72}
     .out-info{color:#58a6ff;font-style:italic}
-    .input-row{
-      display:flex;
-      background:#161b22;
-      border-top:1px solid #0f3460;
-      padding:6px 10px;
-      gap:8px;
-      align-items:center;
-      flex-shrink:0
-    }
+    .input-row{display:flex;background:#161b22;border-top:1px solid #0f3460;padding:6px 10px;gap:8px;align-items:center;flex-shrink:0}
     .input-row.hidden{display:none}
-    #input-prompt{
-      color:#58a6ff;
-      font-family:monospace;
-      font-size:0.9rem;
-      min-width:fit-content
-    }
-    #user-input{
-      flex:1;
-      background:#0d1117;
-      border:1px solid #30363d;
-      border-radius:4px;
-      color:#c9d1d9;
-      font-family:monospace;
-      font-size:0.9rem;
-      padding:4px 8px;
-      outline:none
-    }
+    #input-prompt{color:#58a6ff;font-family:monospace;font-size:0.9rem;min-width:fit-content}
+    #user-input{flex:1;background:#0d1117;border:1px solid #30363d;border-radius:4px;color:#c9d1d9;font-family:monospace;font-size:0.9rem;padding:4px 8px;outline:none}
     #user-input:focus{border-color:#58a6ff}
-    #btn-send{
-      background:#238636;
-      color:white;
-      border:none;
-      border-radius:4px;
-      padding:4px 12px;
-      cursor:pointer;
-      font-size:0.85rem
-    }
+    #btn-send{background:#238636;color:white;border:none;border-radius:4px;padding:4px 12px;cursor:pointer;font-size:0.85rem}
     #btn-send:hover{background:#2ea043}
-    .toolbar{
-      background:#16213e;
-      padding:8px 14px;
-      display:flex;
-      gap:10px;
-      align-items:center;
-      border-top:2px solid #0f3460;
-      flex-shrink:0
-    }
-    .run-btn{
-      background:#e94560;
-      color:white;
-      border:none;
-      border-radius:6px;
-      padding:8px 22px;
-      font-size:0.95rem;
-      font-weight:600;
-      cursor:pointer
-    }
+    .toolbar{background:#16213e;padding:8px 14px;display:flex;gap:10px;align-items:center;border-top:2px solid #0f3460;flex-shrink:0}
+    .run-btn{background:#e94560;color:white;border:none;border-radius:6px;padding:8px 22px;font-size:0.95rem;font-weight:600;cursor:pointer}
     .run-btn:hover{background:#c73652}
     .run-btn:disabled{background:#555;cursor:not-allowed}
-    .clear-btn{
-      background:transparent;
-      color:#a0aec0;
-      border:1px solid #30363d;
-      border-radius:6px;
-      padding:8px 16px;
-      font-size:0.9rem;
-      cursor:pointer
-    }
+    .clear-btn{background:transparent;color:#a0aec0;border:1px solid #30363d;border-radius:6px;padding:8px 16px;font-size:0.9rem;cursor:pointer}
     .clear-btn:hover{color:#e0e0e0;border-color:#58a6ff}
     #status{margin-left:auto;font-size:0.8rem;color:#58a6ff}
   </style>
@@ -145,7 +48,6 @@
       <div class="subtitle">Ambiente di programmazione &mdash; Liceo</div>
     </div>
   </header>
-
   <div class="main">
     <div class="editor-panel">
       <div class="panel-label">&#x1F4DD; Codice Python</div>
@@ -160,13 +62,10 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
         <span id="status">Caricamento Python...</span>
       </div>
     </div>
-
     <div class="output-panel">
       <div class="panel-label">&#x25B6; Output</div>
-      <div id="output">
-        <span class="out-info">Pronto. Scrivi il tuo codice e premi Esegui.
-</span>
-      </div>
+      <div id="output"><span class="out-info">Pronto. Scrivi il tuo codice e premi Esegui.
+</span></div>
       <div id="input-row" class="input-row hidden">
         <span id="input-prompt">&gt;&gt;&gt; </span>
         <input type="text" id="user-input" autocomplete="off" spellcheck="false">
@@ -174,7 +73,6 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
       </div>
     </div>
   </div>
-
   <script>
     const editor = CodeMirror.fromTextArea(document.getElementById('code'), {
       mode: 'python',
@@ -210,25 +108,28 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
     async function loadPy() {
       statusEl.textContent = 'Caricamento Python...';
       pyodide = await loadPyodide();
-
-      pyodide.globals.set('_js_print', (t) => {
-        appendOutput(t, 'out-text');
-      });
-
+      pyodide.globals.set('_js_print', (t) => { appendOutput(t, 'out-text'); });
+      pyodide.globals.set('_js_input', (p) => getInputFromUser(p));
       await pyodide.runPythonAsync(`
-import sys
+import sys, builtins
 
-class _W:
+class _Writer:
     def write(self, t):
-        if t:
-            _js_print(t)
-    def flush(self):
-        pass
+        if t: _js_print(t)
+    def flush(self): pass
 
-sys.stdout = _W()
-sys.stderr = _W()
+sys.stdout = _Writer()
+sys.stderr = _Writer()
+
+def input(prompt=''):
+    import pyodide.ffi
+    result = _js_input(prompt)
+    if hasattr(result, 'to_py'):
+        return result.to_py()
+    return str(result)
+
+builtins.input = input
       `);
-
       statusEl.textContent = 'Python pronto ✓';
       btnRun.disabled = false;
     }
@@ -255,39 +156,20 @@ sys.stderr = _W()
 
     btnSend.addEventListener('click', sendInput);
     userInputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        sendInput();
-      }
+      if (e.key === 'Enter') { e.preventDefault(); sendInput(); }
     });
 
     btnRun.addEventListener('click', async () => {
       const code = editor.getValue();
       if (!code.trim()) return;
-
       btnRun.disabled = true;
       statusEl.textContent = 'In esecuzione...';
       outputEl.innerHTML = '';
-
       try {
-        pyodide.globals.set('_js_input', getInputFromUser);
-
-        await pyodide.runPythonAsync(`
-import js
-import builtins
-
-def input(prompt=''):
-    import js
-    return js._js_input(prompt).to_py()
-
-builtins.input = input
-        `);
-
         await pyodide.runPythonAsync(code);
       } catch (err) {
         appendOutput(String(err) + '\n', 'out-error');
       }
-
       btnRun.disabled = false;
       statusEl.textContent = 'Python pronto ✓';
     });
