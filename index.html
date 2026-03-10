@@ -67,7 +67,7 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
       <div id="output"><span class="out-info">Pronto. Scrivi il tuo codice e premi Esegui.
 </span></div>
       <div id="input-row" class="input-row hidden">
-        <span id="input-prompt">&gt;&gt;&gt; </span>
+        <span id="input-prompt"></span>
         <input type="text" id="user-input" autocomplete="off" spellcheck="false">
         <button id="btn-send">Invia</button>
       </div>
@@ -82,17 +82,16 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
     editor.setSize('100%', '100%');
 
     let pyodide = null;
-    // Coda messaggi per input: ogni elemento e' una Promise {resolve}
-    let inputQueue = [];
+    let inputResolve = null;
 
-    const outputEl = document.getElementById('output');
-    const btnRun = document.getElementById('btn-run');
-    const btnClear = document.getElementById('btn-clear');
-    const statusEl = document.getElementById('status');
-    const inputRow = document.getElementById('input-row');
-    const userInputEl = document.getElementById('user-input');
-    const btnSend = document.getElementById('btn-send');
-    const inputPromptEl = document.getElementById('input-prompt');
+    const outputEl  = document.getElementById('output');
+    const btnRun    = document.getElementById('btn-run');
+    const btnClear  = document.getElementById('btn-clear');
+    const statusEl  = document.getElementById('status');
+    const inputRow  = document.getElementById('input-row');
+    const userInput = document.getElementById('user-input');
+    const btnSend   = document.getElementById('btn-send');
+    const promptEl  = document.getElementById('input-prompt');
 
     function appendOutput(text, cls) {
       const s = document.createElement('span');
@@ -102,78 +101,85 @@ print("Ciao", nome, "- hai", eta, "anni!")</textarea>
       outputEl.scrollTop = outputEl.scrollHeight;
     }
 
-    // Restituisce una Promise che si risolve quando l'utente invia l'input
-    function askUser(promptText) {
-      return new Promise((resolve) => {
-        inputPromptEl.textContent = promptText || '';
+    // Chiamata da Python (e' una funzione normale che ritorna una Promise)
+    function jsInput(promptText) {
+      return new Promise(resolve => {
+        promptEl.textContent = promptText || '';
         inputRow.classList.remove('hidden');
-        userInputEl.value = '';
-        userInputEl.focus();
-        inputQueue.push(resolve);
+        userInput.value = '';
+        userInput.focus();
+        inputResolve = resolve;
       });
     }
 
     function sendInput() {
-      if (inputQueue.length === 0) return;
-      const val = userInputEl.value;
-      appendOutput((inputPromptEl.textContent || '') + val + '\n', 'out-text');
+      if (!inputResolve) return;
+      const val = userInput.value;
+      appendOutput((promptEl.textContent || '') + val + '\n', 'out-text');
       inputRow.classList.add('hidden');
-      const resolve = inputQueue.shift();
-      resolve(val);
+      const r = inputResolve;
+      inputResolve = null;
+      r(val);
     }
 
     btnSend.addEventListener('click', sendInput);
-    userInputEl.addEventListener('keydown', (e) => {
+    userInput.addEventListener('keydown', e => {
       if (e.key === 'Enter') { e.preventDefault(); sendInput(); }
     });
 
     async function loadPy() {
       statusEl.textContent = 'Caricamento Python...';
-      pyodide = await loadPyodide();
+      try {
+        pyodide = await loadPyodide();
 
-      // Registra le funzioni JS in globals Python
-      pyodide.globals.set('_js_print', (t) => appendOutput(t, 'out-text'));
-      pyodide.globals.set('_js_input', (p) => askUser(p));
+        // Redirect stdout/stderr
+        pyodide.setStdout({ batched: t => appendOutput(t + '\n', 'out-text') });
+        pyodide.setStderr({ batched: t => appendOutput(t + '\n', 'out-error') });
 
-      await pyodide.runPythonAsync(`
-import sys, builtins
-from pyodide.ffi import run_sync
+        // Espone jsInput a Python come funzione awaitable
+        pyodide.globals.set('_js_input', pyodide.toPy(jsInput));
 
-class _Writer:
-    def write(self, t):
-        if t: _js_print(t)
-    def flush(self): pass
+        // Definisce input() asincrona in Python
+        await pyodide.runPythonAsync(`
+import builtins
+from pyodide.ffi import JsProxy
 
-sys.stdout = _Writer()
-sys.stderr = _Writer()
-
-def input(prompt=''):
-    if prompt:
-        _js_print(str(prompt))
-    return run_sync(_js_input(''))
+async def input(prompt=''):
+    result = await _js_input(str(prompt) if prompt else '')
+    return result
 
 builtins.input = input
-      `);
+        `);
 
-      statusEl.textContent = 'Python pronto ✓';
-      btnRun.disabled = false;
+        statusEl.textContent = 'Python pronto \u2713';
+        btnRun.disabled = false;
+      } catch(e) {
+        statusEl.textContent = 'Errore caricamento: ' + e.message;
+      }
     }
 
     btnRun.addEventListener('click', async () => {
       const code = editor.getValue();
       if (!code.trim()) return;
       btnRun.disabled = true;
-      inputQueue = [];
+      inputResolve = null;
       inputRow.classList.add('hidden');
       statusEl.textContent = 'In esecuzione...';
       outputEl.innerHTML = '';
       try {
-        await pyodide.runPythonAsync(code);
+        // Wrap il codice in una funzione async e la esegue
+        const wrapped = `
+async def __main__():
+${code.split('\n').map(l => '    ' + l).join('\n')}
+import asyncio
+await __main__()
+`;
+        await pyodide.runPythonAsync(wrapped);
       } catch (err) {
         appendOutput(String(err) + '\n', 'out-error');
       }
       btnRun.disabled = false;
-      statusEl.textContent = 'Python pronto ✓';
+      statusEl.textContent = 'Python pronto \u2713';
     });
 
     btnClear.addEventListener('click', () => {
