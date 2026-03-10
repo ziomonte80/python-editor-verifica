@@ -141,34 +141,32 @@
 <body>
   <header>
     <div>
-      <div class="logo">💻 Editor Python</div>
-      <div class="subtitle">Ambiente di programmazione — Liceo</div>
+      <div class="logo">&#x1F4BB; Editor Python</div>
+      <div class="subtitle">Ambiente di programmazione &mdash; Liceo</div>
     </div>
   </header>
 
   <div class="main">
     <div class="editor-panel">
-      <div class="panel-label">📝 Codice Python</div>
+      <div class="panel-label">&#x1F4DD; Codice Python</div>
       <div class="editor-wrap">
-        <textarea id="code">
-nome = input("Come ti chiami? ")
+        <textarea id="code">nome = input("Come ti chiami? ")
 eta = input("Quanti anni hai? ")
-print("Ciao", nome, "- hai", eta, "anni!")
-        </textarea>
+print("Ciao", nome, "- hai", eta, "anni!")</textarea>
       </div>
       <div class="toolbar">
-        <button id="btn-run" class="run-btn" disabled>▶ Esegui</button>
-        <button id="btn-clear" class="clear-btn">🗑 Pulisci output</button>
+        <button id="btn-run" class="run-btn" disabled>&#x25B6; Esegui</button>
+        <button id="btn-clear" class="clear-btn">&#x1F5D1; Pulisci output</button>
         <span id="status">Caricamento Python...</span>
       </div>
     </div>
 
     <div class="output-panel">
-      <div class="panel-label">▶ Output</div>
+      <div class="panel-label">&#x25B6; Output</div>
       <div id="output">
-        <span class="out-info">Pronto. Scrivi il tuo codice e premi Esegui.\n</span>
+        <span class="out-info">Pronto. Scrivi il tuo codice e premi Esegui.
+</span>
       </div>
-
       <div id="input-row" class="input-row hidden">
         <span id="input-prompt">&gt;&gt;&gt; </span>
         <input type="text" id="user-input" autocomplete="off" spellcheck="false">
@@ -275,11 +273,14 @@ sys.stderr = _W()
         pyodide.globals.set('_js_input', getInputFromUser);
 
         await pyodide.runPythonAsync(`
-import builtins as _b
-from js import _js_input
+import js
+import builtins
 
 def input(prompt=''):
-    return _js_input(prompt).to_py()
+    import js
+    return js._js_input(prompt).to_py()
+
+builtins.input = input
         `);
 
         await pyodide.runPythonAsync(code);
@@ -292,7 +293,7 @@ def input(prompt=''):
     });
 
     btnClear.addEventListener('click', () => {
-      outputEl.innerHTML = '<span class="out-info">Output pulito.\\n</span>';
+      outputEl.innerHTML = '<span class="out-info">Output pulito.\n</span>';
     });
 
     loadPy();
